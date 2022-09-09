@@ -33,6 +33,7 @@ def read_hunks():
 
 def main() -> None:
     files = {}
+    cleanup = []
     for fn, hunk in read_hunks():
         orig_newlines = hunk.count("\n")
         try:
@@ -45,6 +46,7 @@ def main() -> None:
             subprocess.check_call(
                 ("bash", "-c", 'git cat-file -p :"$1" > "$2"', "--", fn, orig)
             )
+            cleanup.append(orig)
         patched = subprocess.check_output(
             ("patch", "--quiet", "-o", "-", orig), input=hunk, universal_newlines=True
         )
@@ -74,6 +76,8 @@ def main() -> None:
                 + "".join(" " + line for line in raw_difft.splitlines(True))
             )
         print(difft, flush=True, end="")
+    for f in cleanup:
+        os.remove(f)
 
 
 if __name__ == "__main__":
