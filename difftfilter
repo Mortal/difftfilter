@@ -7,24 +7,24 @@ import subprocess
 import sys
 
 # https://stackoverflow.com/questions/14693701/how-can-i-remove-the-ansi-escape-sequences-from-a-string-in-python
-ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
+ansi_escape = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
 
 
 def read_hunks():
     hunk = ""
     fn = ""
     for line in sys.stdin:
-        line = ansi_escape.sub('', line)
+        line = ansi_escape.sub("", line)
         diff_git = "diff --git "
         if line.startswith(diff_git):
             if hunk:
                 yield fn, hunk
                 hunk = ""
             assert line.endswith("\n")
-            x = line[len(diff_git):-1]
+            x = line[len(diff_git) : -1]
             assert x.startswith("a/")
-            assert x[len(x)//2] == " ", (x, x[len(x)//2])
-            fn = x[2:len(x)//2]
+            assert x[len(x) // 2] == " ", (x, x[len(x) // 2])
+            fn = x[2 : len(x) // 2]
             assert line == f"diff --git a/{fn} b/{fn}\n"
         hunk += line
     if hunk:
@@ -42,15 +42,37 @@ def main() -> None:
                 content = files[fn] = fp.read()
         orig = "%s.ORIG.%s" % (fn, os.getpid())
         if not os.path.exists(orig):
-            subprocess.check_call(("bash", "-c", 'git cat-file -p :"$1" > "$2"', "--", fn, orig))
-        patched = subprocess.check_output(("patch", "--quiet", "-o", "-", orig), input=hunk, universal_newlines=True)
-        raw_difft = subprocess.check_output(("difft", "--color", "always", "--language", os.path.splitext(fn)[1].strip("."), orig, "/dev/stdin"), input=patched, universal_newlines=True)
-        difft = "".join(hunk.splitlines(True)[:5]) + "".join(" " + line for line in raw_difft.splitlines(True))
+            subprocess.check_call(
+                ("bash", "-c", 'git cat-file -p :"$1" > "$2"', "--", fn, orig)
+            )
+        patched = subprocess.check_output(
+            ("patch", "--quiet", "-o", "-", orig), input=hunk, universal_newlines=True
+        )
+        raw_difft = subprocess.check_output(
+            (
+                "difft",
+                "--color",
+                "always",
+                "--language",
+                os.path.splitext(fn)[1].strip("."),
+                orig,
+                "/dev/stdin",
+            ),
+            input=patched,
+            universal_newlines=True,
+        )
+        difft = "".join(hunk.splitlines(True)[:5]) + "".join(
+            " " + line for line in raw_difft.splitlines(True)
+        )
         difft_newlines = difft.count("\n")
         if difft_newlines > orig_newlines:
             difft = "".join(difft.splitlines(True)[:orig_newlines])[:-1] + "TRUNC\n"
         else:
-            difft = "".join(hunk.splitlines(True)[:5]) + "~\n" * (orig_newlines - difft_newlines) + "".join(" " + line for line in raw_difft.splitlines(True))
+            difft = (
+                "".join(hunk.splitlines(True)[:5])
+                + "~\n" * (orig_newlines - difft_newlines)
+                + "".join(" " + line for line in raw_difft.splitlines(True))
+            )
         print(difft, flush=True, end="")
 
 
